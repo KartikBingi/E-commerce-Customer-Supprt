@@ -5,8 +5,9 @@ st.title("🌟 CSAT Prediction Dashboard")
 user_input = st.text_area("Enter Customer Remark:")
 
 if st.button("Analyze Sentiment"):
-    model = joblib.load('csat_xgboost_model.joblib')
-    vectorizer = joblib.load('tfidf_vectorizer.joblib')
+    # Change line 8 and 9 to match your uploaded filenames
+model = joblib.load('model.joblib')
+vectorizer = joblib.load('vectorizer.joblib')
     
     vec = vectorizer.transform([user_input])
     res = model.predict(vec)
