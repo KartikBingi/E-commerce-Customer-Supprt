@@ -6,88 +6,99 @@ import time
 st.set_page_config(
     page_title="CSAT AI Analytics",
     page_icon="🎯",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# --- 2. ASSET LOADING (with Caching) ---
+# --- 2. GLOBAL CONSTANTS (Fixes NameError) ---
+COLORS = {
+    1: "#FF4B4B", # Red
+    2: "#FFAA00", # Orange
+    3: "#FFEE00", # Yellow
+    4: "#00FF00", # Light Green
+    5: "#09AB3B"  # Dark Green
+}
+
+# --- 3. ASSET LOADING ---
 @st.cache_resource
 def load_assets():
-    # Ensure these files are in your GitHub repo
     model = joblib.load('csat_xgboost_model.joblib')
     tfidf = joblib.load('tfidf_vectorizer.joblib')
     return model, tfidf
 
-try:
-    model, tfidf = load_assets()
-except Exception as e:
-    st.error("⚠️ Model files not found. Please ensure .joblib files are uploaded to GitHub.")
+model, tfidf = load_assets()
 
-# --- 3. CUSTOM STYLING (CSS) ---
+# --- 4. CSS FOR PROFESSIONAL LOOK ---
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    .stTextArea textarea { border: 1px solid #4a4a4a; border-radius: 10px; }
     .metric-card {
         background-color: #161b22;
-        padding: 25px;
+        padding: 30px;
         border-radius: 15px;
         border: 1px solid #30363d;
         text-align: center;
+        margin-top: 20px;
     }
+    .stTextArea textarea { border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 4. SIDEBAR ---
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=100)
-    st.title("Admin Panel")
-    st.markdown("---")
-    st.write("**Model Engine:** XGBoost 3.2.0")
-    st.write("**NLP Pipeline:** TF-IDF Vectorizer")
-    st.info("This system uses Natural Language Processing to detect customer sentiment and predict CSAT scores.")
-
 # --- 5. MAIN INTERFACE ---
 st.title("🎯 AI-Powered CSAT Prediction")
-st.markdown("Analyze customer remarks to generate instant satisfaction metrics.")
+st.write("Professional Sentiment Analysis for E-Commerce Feedback")
 
 col_left, col_right = st.columns([1.5, 1])
 
 with col_left:
-    # Use a Form for the "Standard" Clear/Submit behavior
+    # Use a Form to handle the "Clear" button properly without errors
     with st.form("input_form", clear_on_submit=True):
         user_input = st.text_area(
             "Customer Remarks",
-            placeholder="Type customer feedback here (e.g., 'The delivery was late and the item is damaged')...",
+            placeholder="Type feedback here (e.g., 'The delivery was not ok')...",
             height=200
         )
         
-        c1, c2 = st.columns([1, 1])
+        c1, c2 = st.columns(2)
         with c1:
-            submit_btn = st.form_submit_button("🚀 Run Analysis")
+            submit_btn = st.form_submit_button("🚀 Run Analysis", use_container_width=True)
         with c2:
-            # This button will clear the text area because clear_on_submit=True
-            clear_btn = st.form_submit_button("🗑️ Clear Dashboard")
+            # clear_on_submit=True handles the text clearing automatically
+            st.form_submit_button("🗑️ Clear Dashboard", use_container_width=True)
 
 with col_right:
     st.markdown("### 📊 Prediction Result")
     
-    if submit_btn:
-        if user_input.strip():
-            with st.spinner("Analyzing sentiment patterns..."):
-                time.sleep(0.6) # Aesthetic delay for 'Advanced' feel
-                
-                # PREDICTION LOGIC
-                processed_input = user_input.lower()
-                vec = tfidf.transform([processed_input])
-                raw_pred = model.predict(vec)[0]
-                final_score = int(raw_pred) + 1
-                
-                # MANUAL ACCURACY CORRECTION
-                # Catching negatives that basic TF-IDF models might miss (like "not ok")
-                neg_words = ['not', 'bad', 'worst', 'broken', 'terrible', 'disappointed', 'late']
-                if any(word in processed_input for word in neg_words) and final_score > 3:
-                    final_score = 2
+    if submit_btn and user_input.strip():
+        with st.spinner("Analyzing..."):
+            time.sleep(0.5)
+            
+            # Prediction Logic
+            processed_text = user_input.lower()
+            vec = tfidf.transform([processed_text])
+            prediction = model.predict(vec)[0]
+            final_score = int(prediction) + 1
+            
+            # --- THE "NOT OK" FIX (Manual override for biased models) ---
+            neg_keywords = ['not', 'bad', 'worst', 'broken', 'terrible', 'late', 'rude']
+            if any(word in processed_text for word in neg_keywords) and final_score > 3:
+                final_score = 2 
 
-                # VISUAL OUTPUT
-                colors
+            # Display Output
+            current_color = COLORS.get(final_score, "#FFFFFF")
+            
+            st.markdown(f"""
+                <div class="metric-card">
+                    <h4 style="color: #8b949e;">PREDICTED CSAT</h4>
+                    <h1 style="color: {current_color}; font-size: 72px; margin: 10px 0;">{final_score} / 5</h1>
+                    <p style="font-size: 24px;">{"⭐" * final_score}</p>
+                </div>
+            """, unsafe_allow_html=True)
+
+            if final_score >= 4:
+                st.success("Positive Sentiment Detected")
+                st.balloons()
+            elif final_score == 3:
+                st.warning("Neutral Sentiment Detected")
+            else:
+                st.error("Action Required: Negative Sentiment")
+    else:
+        st.info("Enter remarks and click 'Run Analysis' to see the predicted star rating.")
