@@ -2,11 +2,11 @@ import streamlit as st
 import joblib
 import time
 
-# --- ADVANCED PAGE CONFIG ---
-st.set_page_config(page_title="CSAT AI Engine", page_icon="📊", layout="wide")
+# --- 1. ADVANCED PAGE CONFIG ---
+st.set_page_config(page_title="AI CSAT Engine", page_icon="📈", layout="wide")
 
-# Load model and vectorizer
-@st.cache_resource # Keeps model in memory for speed
+# Load model and vectorizer with caching for speed
+@st.cache_resource
 def load_assets():
     model = joblib.load('csat_xgboost_model.joblib')
     tfidf = joblib.load('tfidf_vectorizer.joblib')
@@ -14,80 +14,62 @@ def load_assets():
 
 model, tfidf = load_assets()
 
-# --- CUSTOM CSS FOR ADVANCED LOOK ---
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    .stTextArea textarea { font-size: 1.1rem !important; }
-    .score-card { 
-        padding: 20px; 
-        border-radius: 10px; 
-        text-align: center;
-        background-color: #1e2130;
-        border: 1px solid #3e445b;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+# --- 2. FIX FOR THE CLEAR BUTTON (THE CALLBACK) ---
+def reset_dashboard():
+    # This resets the key BEFORE the widget is created
+    st.session_state["remarks_box"] = ""
 
-# --- SIDEBAR ---
+# --- 3. SIDEBAR DETAILS ---
 with st.sidebar:
-    st.title("🛡️ CSAT Analytics")
+    st.title("📊 Project Analytics")
     st.markdown("---")
     st.write("**Model:** XGBoost Classifier")
-    st.write("**NLP:** TF-IDF Vectorization")
-    st.write("**Dependencies:**", ["streamlit", "xgboost", "joblib"])
-    st.info("This engine analyzes customer sentiment to provide actionable satisfaction scores.")
+    st.write("**NLP:** TF-IDF Vectorizer")
+    st.info("This engine predicts Customer Satisfaction based on text sentiment.")
 
-# --- MAIN CONTENT ---
+# --- 4. MAIN INTERFACE ---
 st.title("🚀 Advanced CSAT Prediction Engine")
-st.subheader("Analyze Customer Sentiment in Real-Time")
 
-# Use columns for a cleaner layout
-col_input, col_output = st.columns([2, 1])
+col_left, col_right = st.columns([2, 1])
 
-with col_input:
-    # Key-linked input for the Clear button functionality
+with col_left:
+    # Text Input - The 'key' matches the reset function above
     user_input = st.text_area(
         "Enter Customer Remarks:", 
-        placeholder="Type here (e.g., 'The service was slow but the agent was nice' or 'I love this product!')",
+        placeholder="e.g., 'The product quality is poor and delivery was late.'",
         height=200,
         key="remarks_box"
     )
-    
-    btn_col1, btn_col2 = st.columns([1, 1])
-    with btn_col1:
-        predict_btn = st.button("🔍 Run AI Prediction", use_container_width=True)
-    with btn_col2:
-        # Improved Clear functionality using st.rerun()
-        if st.button("🗑️ Clear Dashboard", use_container_width=True):
-            st.session_state.remarks_box = ""
-            st.rerun()
 
-with col_output:
-    st.markdown("### Result Visualization")
-    if predict_btn and user_input.strip():
-        with st.spinner("Analyzing sentiment..."):
-            time.sleep(0.5) # Simulated latency for "Advanced" feel
+    btn_1, btn_2 = st.columns(2)
+    with btn_1:
+        predict_clicked = st.button("🔍 Run AI Analysis", use_container_width=True, type="primary")
+    with btn_2:
+        # We use on_click to call our fix function
+        st.button("🗑️ Clear Dashboard", on_click=reset_dashboard, use_container_width=True)
+
+with col_right:
+    st.subheader("AI Result")
+    if predict_clicked and user_input.strip():
+        with st.spinner("Processing Sentiment..."):
+            time.sleep(0.4) # Aesthetic delay
             
-            # Prediction logic
-            vec = tfidf.transform([user_input])
+            # Prediction Logic
+            vec = tfidf.transform([user_input.lower()])
             res = model.predict(vec)[0]
-            final_score = int(res) + 1 # Shifting labels back
+            final_score = int(res) + 1
             
-            # Dynamic output colors
-            colors = {1: "#FF4B4B", 2: "#FFAA00", 3: "#FFEE00", 4: "#00FF00", 5: "#09AB3B"}
-            color = colors.get(final_score, "#FFFFFF")
+            # UI Visualization
+            colors = {1: "🔴", 2: "🟠", 3: "🟡", 4: "🟢", 5: "💎"}
+            rating_text = colors.get(final_score, "⚪")
             
-            st.markdown(f"""
-                <div class="score-card">
-                    <h2 style='color: {color};'>Predicted Score</h2>
-                    <h1 style='color: {color}; font-size: 4rem;'>{final_score}</h1>
-                    <p style='color: {color}; font-weight: bold;'>{"⭐" * final_score}</p>
-                </div>
-            """, unsafe_allow_html=True)
+            st.metric(label="Predicted CSAT", value=f"{final_score} / 5")
+            st.write(f"Rating: {rating_text * final_score}")
             
-            # Success feedback
-            if final_score >= 4:
+            if final_score <= 2:
+                st.error("Action Required: Low Satisfaction Detected")
+            elif final_score >= 4:
+                st.success("High Satisfaction: Positive Feedback")
                 st.balloons()
     else:
-        st.info("Awaiting input to generate prediction.")
+        st.info("Enter text and click 'Run Analysis' to see results.")
