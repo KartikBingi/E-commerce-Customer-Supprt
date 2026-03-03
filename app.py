@@ -2,74 +2,92 @@ import streamlit as st
 import joblib
 import time
 
-# --- 1. ADVANCED PAGE CONFIG ---
-st.set_page_config(page_title="AI CSAT Engine", page_icon="📈", layout="wide")
+# --- 1. PAGE CONFIGURATION ---
+st.set_page_config(
+    page_title="CSAT AI Analytics",
+    page_icon="🎯",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Load model and vectorizer with caching for speed
+# --- 2. ASSET LOADING (with Caching) ---
 @st.cache_resource
 def load_assets():
+    # Ensure these files are in your GitHub repo
     model = joblib.load('csat_xgboost_model.joblib')
     tfidf = joblib.load('tfidf_vectorizer.joblib')
     return model, tfidf
 
-model, tfidf = load_assets()
+try:
+    model, tfidf = load_assets()
+except Exception as e:
+    st.error("⚠️ Model files not found. Please ensure .joblib files are uploaded to GitHub.")
 
-# --- 2. FIX FOR THE CLEAR BUTTON (THE CALLBACK) ---
-def reset_dashboard():
-    # This resets the key BEFORE the widget is created
-    st.session_state["remarks_box"] = ""
+# --- 3. CUSTOM STYLING (CSS) ---
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; }
+    .stTextArea textarea { border: 1px solid #4a4a4a; border-radius: 10px; }
+    .metric-card {
+        background-color: #161b22;
+        padding: 25px;
+        border-radius: 15px;
+        border: 1px solid #30363d;
+        text-align: center;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-# --- 3. SIDEBAR DETAILS ---
+# --- 4. SIDEBAR ---
 with st.sidebar:
-    st.title("📊 Project Analytics")
+    st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=100)
+    st.title("Admin Panel")
     st.markdown("---")
-    st.write("**Model:** XGBoost Classifier")
-    st.write("**NLP:** TF-IDF Vectorizer")
-    st.info("This engine predicts Customer Satisfaction based on text sentiment.")
+    st.write("**Model Engine:** XGBoost 3.2.0")
+    st.write("**NLP Pipeline:** TF-IDF Vectorizer")
+    st.info("This system uses Natural Language Processing to detect customer sentiment and predict CSAT scores.")
 
-# --- 4. MAIN INTERFACE ---
-st.title("🚀 Advanced CSAT Prediction Engine")
+# --- 5. MAIN INTERFACE ---
+st.title("🎯 AI-Powered CSAT Prediction")
+st.markdown("Analyze customer remarks to generate instant satisfaction metrics.")
 
-col_left, col_right = st.columns([2, 1])
+col_left, col_right = st.columns([1.5, 1])
 
 with col_left:
-    # Text Input - The 'key' matches the reset function above
-    user_input = st.text_area(
-        "Enter Customer Remarks:", 
-        placeholder="e.g., 'The product quality is poor and delivery was late.'",
-        height=200,
-        key="remarks_box"
-    )
-
-    btn_1, btn_2 = st.columns(2)
-    with btn_1:
-        predict_clicked = st.button("🔍 Run AI Analysis", use_container_width=True, type="primary")
-    with btn_2:
-        # We use on_click to call our fix function
-        st.button("🗑️ Clear Dashboard", on_click=reset_dashboard, use_container_width=True)
+    # Use a Form for the "Standard" Clear/Submit behavior
+    with st.form("input_form", clear_on_submit=True):
+        user_input = st.text_area(
+            "Customer Remarks",
+            placeholder="Type customer feedback here (e.g., 'The delivery was late and the item is damaged')...",
+            height=200
+        )
+        
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            submit_btn = st.form_submit_button("🚀 Run Analysis")
+        with c2:
+            # This button will clear the text area because clear_on_submit=True
+            clear_btn = st.form_submit_button("🗑️ Clear Dashboard")
 
 with col_right:
-    st.subheader("AI Result")
-    if predict_clicked and user_input.strip():
-        with st.spinner("Processing Sentiment..."):
-            time.sleep(0.4) # Aesthetic delay
-            
-            # Prediction Logic
-            vec = tfidf.transform([user_input.lower()])
-            res = model.predict(vec)[0]
-            final_score = int(res) + 1
-            
-            # UI Visualization
-            colors = {1: "🔴", 2: "🟠", 3: "🟡", 4: "🟢", 5: "💎"}
-            rating_text = colors.get(final_score, "⚪")
-            
-            st.metric(label="Predicted CSAT", value=f"{final_score} / 5")
-            st.write(f"Rating: {rating_text * final_score}")
-            
-            if final_score <= 2:
-                st.error("Action Required: Low Satisfaction Detected")
-            elif final_score >= 4:
-                st.success("High Satisfaction: Positive Feedback")
-                st.balloons()
-    else:
-        st.info("Enter text and click 'Run Analysis' to see results.")
+    st.markdown("### 📊 Prediction Result")
+    
+    if submit_btn:
+        if user_input.strip():
+            with st.spinner("Analyzing sentiment patterns..."):
+                time.sleep(0.6) # Aesthetic delay for 'Advanced' feel
+                
+                # PREDICTION LOGIC
+                processed_input = user_input.lower()
+                vec = tfidf.transform([processed_input])
+                raw_pred = model.predict(vec)[0]
+                final_score = int(raw_pred) + 1
+                
+                # MANUAL ACCURACY CORRECTION
+                # Catching negatives that basic TF-IDF models might miss (like "not ok")
+                neg_words = ['not', 'bad', 'worst', 'broken', 'terrible', 'disappointed', 'late']
+                if any(word in processed_input for word in neg_words) and final_score > 3:
+                    final_score = 2
+
+                # VISUAL OUTPUT
+                colors
