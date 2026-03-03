@@ -1,13 +1,24 @@
 import streamlit as st
 import joblib
 
-user_input = st.text_area("Enter Customer Remark:")
+# 1. Load the files (Make sure these names match your downloads exactly)
+model = joblib.load('csat_xgboost_model.joblib')
+tfidf = joblib.load('tfidf_vectorizer.joblib')
 
-if st.button("Analyze Sentiment"):
-    # Everything below this line MUST be indented (4 spaces or 1 tab)
-    model = joblib.load('model.joblib')
-    vectorizer = joblib.load('tfidf_vectorizer.joblib')
-    
-    vec = vectorizer.transform([user_input])
-    prediction = model.predict(vec)
-    st.write(f"Predicted CSAT: {prediction[0]}")
+st.title("Customer Satisfaction Prediction")
+user_input = st.text_area("Enter Customer Remarks:")
+
+if st.button("Predict CSAT"):
+    if user_input:
+        # 2. Transform the text using the loaded vectorizer
+        vectorized_input = tfidf.transform([user_input])
+        
+        # 3. Predict
+        prediction = model.predict(vectorized_input)[0]
+        
+        # 4. IMPORTANT: Add +1 because we shifted labels to 0-4 for training
+        final_score = prediction + 1
+        
+        st.success(f"Predicted CSAT Score: {final_score} Stars")
+    else:
+        st.warning("Please enter some text first!")
