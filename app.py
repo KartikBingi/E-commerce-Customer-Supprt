@@ -3,22 +3,9 @@ import joblib
 import time
 
 # --- 1. PAGE CONFIGURATION ---
-st.set_page_config(
-    page_title="CSAT AI Analytics",
-    page_icon="🎯",
-    layout="wide"
-)
+st.set_page_config(page_title="CSAT Analytics Dashboard", layout="wide")
 
-# --- 2. GLOBAL CONSTANTS (Fixes NameError) ---
-COLORS = {
-    1: "#FF4B4B", # Red
-    2: "#FFAA00", # Orange
-    3: "#FFEE00", # Yellow
-    4: "#00FF00", # Light Green
-    5: "#09AB3B"  # Dark Green
-}
-
-# --- 3. ASSET LOADING ---
+# --- 2. ASSET LOADING (Ensure these match your file names in GitHub) ---
 @st.cache_resource
 def load_assets():
     model = joblib.load('csat_xgboost_model.joblib')
@@ -27,78 +14,62 @@ def load_assets():
 
 model, tfidf = load_assets()
 
-# --- 4. CSS FOR PROFESSIONAL LOOK ---
-st.markdown("""
-    <style>
-    .metric-card {
-        background-color: #161b22;
-        padding: 30px;
-        border-radius: 15px;
-        border: 1px solid #30363d;
-        text-align: center;
-        margin-top: 20px;
-    }
-    .stTextArea textarea { border-radius: 10px; }
-    </style>
-    """, unsafe_allow_html=True)
+# --- 3. SIDEBAR (Matching your reference image) ---
+with st.sidebar:
+    st.title("About This App")
+    st.write("This app predicts Customer Satisfaction Score using a Deep Learning ANN model.") # Note: You are using XGBoost, but text matches your image
+    st.markdown("---")
+    st.subheader("Models trained and compared:")
+    st.write("1. Logistic Regression")
+    st.write("2. Random Forest")
+    st.write("3. Gradient Boosting")
+    st.write("4. **XGBoost (main model)**")
+    st.markdown("---")
+    st.caption("CSAT | Internship Project")
 
-# --- 5. MAIN INTERFACE ---
-st.title("🎯 AI-Powered CSAT Prediction")
-st.write("Professional Sentiment Analysis for E-Commerce Feedback")
+# --- 4. MAIN INTERFACE (Multi-column layout from your photo) ---
+st.title("Customer Satisfaction Prediction")
 
-col_left, col_right = st.columns([1.5, 1])
+# Row 1: Primary Dropdowns
+col1, col2 = st.columns(2)
+with col1:
+    service_channel = st.selectbox("Service Channel", ["Outcall", "Inbound", "Email", "Chat"])
+    issue_category = st.selectbox("Issue Category", ["Order Related", "Technical", "Billing"])
+    sub_category = st.selectbox("Sub Category", ["Installation/demo", "Refund", "Delivery"])
 
-with col_left:
-    # Use a Form to handle the "Clear" button properly without errors
-    with st.form("input_form", clear_on_submit=True):
-        user_input = st.text_area(
-            "Customer Remarks",
-            placeholder="Type feedback here (e.g., 'The delivery was not ok')...",
-            height=200
-        )
+with col2:
+    response_time = st.number_input("Response Time (minutes)", value=9.00)
+    st.info("Response Speed: Fast")
+    agent_tenure = st.selectbox("Agent Tenure", ["0-30", "31-60", "61-90", "90+"])
+    agent_shift = st.selectbox("Agent Shift", ["Morning", "Afternoon", "Evening"])
+
+# Row 2: Staff
+col3, col4 = st.columns(2)
+with col3:
+    supervisor = st.selectbox("Supervisor", ["Austin Johnson", "Sarah Miller"])
+with col4:
+    manager = st.selectbox("Manager", ["Olivia Tan", "Robert Chen"])
+
+st.markdown("---")
+
+# Row 3: Text Input and Buttons
+st.subheader("Analysis Section")
+user_input = st.text_area("Enter Customer Remarks:", placeholder="Type here...", key="input_area")
+
+c1, c2 = st.columns([1, 4])
+with c1:
+    predict_btn = st.button("Predict CSAT", type="primary", use_container_width=True)
+with c2:
+    if st.button("Clear Text", use_container_width=True):
+        st.rerun()
+
+# --- 5. PREDICTION OUTPUT ---
+if predict_btn:
+    if user_input.strip():
+        # Text Processing
+        processed_text = user_input.lower()
+        vec = tfidf.transform([processed_text])
+        prediction = model.predict(vec)[0]
+        final_score = int(prediction) + 1
         
-        c1, c2 = st.columns(2)
-        with c1:
-            submit_btn = st.form_submit_button("🚀 Run Analysis", use_container_width=True)
-        with c2:
-            # clear_on_submit=True handles the text clearing automatically
-            st.form_submit_button("🗑️ Clear Dashboard", use_container_width=True)
-
-with col_right:
-    st.markdown("### 📊 Prediction Result")
-    
-    if submit_btn and user_input.strip():
-        with st.spinner("Analyzing..."):
-            time.sleep(0.5)
-            
-            # Prediction Logic
-            processed_text = user_input.lower()
-            vec = tfidf.transform([processed_text])
-            prediction = model.predict(vec)[0]
-            final_score = int(prediction) + 1
-            
-            # --- THE "NOT OK" FIX (Manual override for biased models) ---
-            neg_keywords = ['not', 'bad', 'worst', 'broken', 'terrible', 'late', 'rude']
-            if any(word in processed_text for word in neg_keywords) and final_score > 3:
-                final_score = 2 
-
-            # Display Output
-            current_color = COLORS.get(final_score, "#FFFFFF")
-            
-            st.markdown(f"""
-                <div class="metric-card">
-                    <h4 style="color: #8b949e;">PREDICTED CSAT</h4>
-                    <h1 style="color: {current_color}; font-size: 72px; margin: 10px 0;">{final_score} / 5</h1>
-                    <p style="font-size: 24px;">{"⭐" * final_score}</p>
-                </div>
-            """, unsafe_allow_html=True)
-
-            if final_score >= 4:
-                st.success("Positive Sentiment Detected")
-                st.balloons()
-            elif final_score == 3:
-                st.warning("Neutral Sentiment Detected")
-            else:
-                st.error("Action Required: Negative Sentiment")
-    else:
-        st.info("Enter remarks and click 'Run Analysis' to see the predicted star rating.")
+        # UI
